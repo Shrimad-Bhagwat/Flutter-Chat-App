@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:chat_app/widgets/user_image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -13,18 +17,25 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   var _isLogin = true;
   var _enteredEmail = '', _enteredPassword = '';
+  File? _selectedImage;
+  var _isAuthenticating = false;
 
   final _formKey = GlobalKey<FormState>();
 
   void _submit() async {
     final isValid = _formKey.currentState!.validate();
-    if (!isValid) {
+    if (!isValid || (!_isLogin && _selectedImage == null)) {
+      // Show Error
       return;
     }
+
     _formKey.currentState!.save();
     // print(_enteredEmail);
     // print(_enteredPassword);
     try {
+      setState(() {
+        _isAuthenticating = true;
+      });
       if (_isLogin) {
         final userCredentials = await _firebase.signInWithEmailAndPassword(
             email: _enteredEmail, password: _enteredPassword);
@@ -33,12 +44,24 @@ class _AuthScreenState extends State<AuthScreen> {
         final userCredentials = await _firebase.createUserWithEmailAndPassword(
             email: _enteredEmail, password: _enteredPassword);
         // print(userCredentials);
+
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child("user_images")
+            .child('${userCredentials.user!.uid}.jpeg');
+        
+          await storageRef.putFile(_selectedImage!);
+          final imageUrl = await (storageRef.getDownloadURL());
+          print(imageUrl);
       }
     } on FirebaseAuthException catch (err) {
       if (err.code == 'email-already-in-use') {}
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(err.message ?? "Authentication failed")));
+      setState(() {
+        _isAuthenticating = false;
+      });
     }
   }
 
@@ -67,6 +90,12 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (!_isLogin)
+                            UserImagePicker(
+                              onPickImage: (pickedImage) {
+                                _selectedImage = pickedImage;
+                              },
+                            ),
                           TextFormField(
                             decoration: const InputDecoration(
                               labelText: "Email Address",
@@ -104,6 +133,9 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(
                             height: 12,
                           ),
+                          if(_isAuthenticating)
+                            CircularProgressIndicator(),
+                          if(!_isAuthenticating)
                           ElevatedButton(
                               onPressed: _submit,
                               style: ElevatedButton.styleFrom(
@@ -111,6 +143,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       .colorScheme
                                       .primaryContainer),
                               child: Text(_isLogin ? "Login" : "Sign Up")),
+                          if(!_isAuthenticating)
                           TextButton(
                             onPressed: () {
                               setState(() {
