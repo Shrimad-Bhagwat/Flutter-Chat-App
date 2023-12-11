@@ -17,7 +17,8 @@ class App extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(
               seedColor: const Color.fromARGB(255, 123, 97, 187)),
         ),
-        home: AuthScreen()
+        debugShowCheckedModeBanner: false,
+        home: const AuthScreen()
     );
   }
 }
